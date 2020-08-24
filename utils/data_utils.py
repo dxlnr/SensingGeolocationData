@@ -40,8 +40,8 @@ class DataLoader():
             else:
                 print("Error encountered while parsing file: ", filename)
 
-        print('Dataframe shape: ', df_complete.shape)
-        print(df_complete.head(20))
+        print('Dataframe shape: ', df_complete.shape, '    ', '(from read_files)')
+        #print(df_complete.head(20))
 
         return (df_complete)
 
@@ -54,6 +54,8 @@ class DataLoader():
             array = dataframe[['Latitude','Longitude', 'Altitude']].to_numpy()
         else:
             print("Error occured - dimensionality is illegal: ", dimension)
+
+        #np.swapaxes(array, 0, 1)
 
         return (array)
 
@@ -86,6 +88,49 @@ class DataLoader():
         return (tops.reset_index())
 
 
-    def drop_duplicates(self, dataframe):
+    def drop_duplicates(self, dataframe, dist=0.0001):
         # Dropping the spatioal coordinates that are saved in the dataset more than one time.
         return dataframe.drop_duplicates(subset=['Latitude', 'Longitude', 'Altitude'])
+
+    def sort_around_area(self, df):
+        '''
+        Function computes distances from topspot and drops the ones that too far.
+        Be cautious! (Runtime)
+        :params df: pandas dataframe.
+        '''
+        top_spot = self.find_popular_spots(df, rank=1)
+        df_result = self.drop_duplicates(df)
+
+        df_result = df_result.loc[:,~df_result.columns.duplicated()]
+        df_result['Distance'] = np.nan
+        df_result.reset_index(inplace=True)
+
+        for i in range(len(df_result.index)):
+            dist = np.sqrt(np.power((top_spot.iloc[0]['Latitude'] - df.iloc[i]['Latitude']), 2) + \
+            np.power((top_spot.iloc[0]['Longitude'] - df.iloc[i]['Longitude']), 2))
+
+            df_result.loc[i, 'Distance'] = dist
+            if dist >= 0.0001:
+                df_result.drop(i, inplace=True)
+
+        return (df_result)
+
+
+    def find_points_jslm(self, df):
+        '''
+        Function filters dataframe in the area of Jerusalem.
+        :params df: pandas dataframe.
+        '''
+
+        long_min = 35.174
+        long_max = 35.274
+        lat_min = 31.72
+        lat_max = 31.822
+
+        df.reset_index(inplace=True)
+
+        indexNames = df[(df['Longitude'] >= long_max) | (df['Longitude'] <= long_min) | \
+                        (df['Latitude'] >= lat_max) | (df['Latitude'] <= lat_min)].index
+        df.drop(indexNames , inplace=True)
+
+        return (df)
